@@ -1401,10 +1401,11 @@
     }
 
     // Initialize dynamic content on load
+    // detectLocale();
     document.addEventListener('DOMContentLoaded', async () => {
         await loadSiteData();
         await loadGames();
-        detectLocale();
+       
         initializeFAQ();
         updateCourseOptions();
         updateDisplayedPrices();
