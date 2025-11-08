@@ -2420,7 +2420,7 @@
             if (!isAdmin()) return;
             
             try {
-                const response = await fetch(`${API_BASE_URL}/users/blacklist-list`);
+                const response = await fetch(`${API_BASE_URL}/users/blacklist?action=list`);
                 if (response.ok) {
                     const data = await response.json();
                     const blacklist = data.blacklist || [];
@@ -2835,7 +2835,7 @@
             
             try {
                 const email = encodeURIComponent(currentUser.email);
-                const response = await fetch(`${API_BASE_URL}/subscriptions/check-renewal?email=${email}`);
+                const response = await fetch(`${API_BASE_URL}/subscriptions?action=check-renewal&email=${email}`);
                 
                 if (response.ok) {
                     const data = await response.json();

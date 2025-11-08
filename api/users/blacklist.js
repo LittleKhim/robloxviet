@@ -4,6 +4,28 @@ const uri = process.env.STORAGE_URL || process.env.MONGODB_URI || 'mongodb+srv:/
 const client = new MongoClient(uri);
 
 export default async function handler(req, res) {
+    // Handle list all blacklist
+    if (req.method === 'GET' && !req.query.email && req.query.action === 'list') {
+        try {
+            await client.connect();
+            const db = client.db('store_db');
+            const blacklistCollection = db.collection('blacklist');
+            
+            const blacklist = await blacklistCollection
+                .find({})
+                .sort({ blacklistedAt: -1 })
+                .toArray();
+            
+            res.status(200).json({ blacklist: blacklist });
+        } catch (error) {
+            console.error('Error getting blacklist:', error);
+            res.status(500).json({ error: 'Failed to get blacklist', details: error.message });
+        } finally {
+            await client.close();
+        }
+        return;
+    }
+    
     const { email } = req.query;
     
     if (!email) {
