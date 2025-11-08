@@ -211,6 +211,22 @@
             </div>
         </div>
 
+        <!-- Notification Modal with Blur Background -->
+        <div class="notification-overlay" id="notification-overlay" style="display: none;">
+            <div class="notification-container">
+                <div class="notification-header">
+                    <i class="fas fa-bell notification-icon"></i>
+                    <button class="notification-close" id="notification-close">&times;</button>
+                </div>
+                <div class="notification-content" id="notification-content">
+                    <!-- Notification content will be inserted here -->
+                </div>
+                <div class="notification-actions" id="notification-actions">
+                    <!-- Action buttons will be inserted here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Transaction History Modal -->
         <div class="transaction-modal-overlay" id="transaction-modal" style="display: none;">
             <div class="transaction-modal-container">
@@ -444,7 +460,68 @@
         
         // Check if current user is admin
         function isAdmin() {
-            return currentUser && currentUser.email === ADMIN_EMAIL;
+            if (!currentUser) return false;
+            // Check both exact match and case-insensitive
+            return currentUser.email && (
+                currentUser.email === ADMIN_EMAIL || 
+                currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+            );
+        }
+        
+        // Check if user has pending transaction
+        function hasPendingTransaction() {
+            if (!currentUser) return false;
+            const userTransactions = JSON.parse(localStorage.getItem(`store_transactions_${currentUser.email}`) || '[]');
+            return userTransactions.some(txn => txn.status === 'pending');
+        }
+        
+        // Notification System
+        function showNotification(title, message, type = 'info', options = {}) {
+            const overlay = document.getElementById('notification-overlay');
+            const content = document.getElementById('notification-content');
+            const actions = document.getElementById('notification-actions');
+            
+            // Set notification type styling
+            const typeConfig = {
+                'info': { icon: 'fa-info-circle', color: '#4caf50' },
+                'warning': { icon: 'fa-exclamation-triangle', color: '#ff9800' },
+                'error': { icon: 'fa-times-circle', color: '#f44336' },
+                'success': { icon: 'fa-check-circle', color: '#4caf50' }
+            };
+            
+            const config = typeConfig[type] || typeConfig.info;
+            
+            content.innerHTML = `
+                <div class="notification-title">
+                    <i class="fas ${config.icon}" style="color: ${config.color};"></i>
+                    <span>${title}</span>
+                </div>
+                <div class="notification-message">${message}</div>
+            `;
+            
+            // Add action buttons if provided
+            if (options.buttons && options.buttons.length > 0) {
+                actions.innerHTML = options.buttons.map(btn => 
+                    `<button class="notification-btn ${btn.class || ''}" onclick="${btn.onclick || 'closeNotification()'}">${btn.text}</button>`
+                ).join('');
+            } else {
+                actions.innerHTML = '<button class="notification-btn notification-btn-primary" onclick="closeNotification()">Đóng</button>';
+            }
+            
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            // Auto close if timeout provided
+            if (options.timeout) {
+                setTimeout(() => {
+                    closeNotification();
+                }, options.timeout);
+            }
+        }
+        
+        function closeNotification() {
+            document.getElementById('notification-overlay').style.display = 'none';
+            document.body.style.overflow = '';
         }
 
         let currentLanguage = 'vi';
@@ -647,62 +724,214 @@
         
         function openRobuxModal() {
             checkLoginBeforeAction(() => {
-                // Get current user balance
-                const currentBalance = userBalance;
-                const balanceText = `\n\n💰 Số tiền hiện tại của bạn: ${formatCurrency(currentBalance)}`;
-                const maxAffordable = Math.floor(currentBalance / ROBUX_RATE);
-                const maxRobux = Math.min(ROBUX_STOCK, maxAffordable);
-                
-                const quantity = prompt(
-                    `Nhập số lượng Robux bạn muốn mua (1-${ROBUX_STOCK.toLocaleString()}):` +
-                    balanceText +
-                    (maxAffordable > 0 ? `\n📊 Bạn có thể mua tối đa: ${maxAffordable.toLocaleString()} Robux` : '\n⚠️ Bạn không đủ tiền để mua Robux!')
-                );
-                
-                if (!quantity) {
-                    return; // User cancelled
-                }
-                
-                if (isNaN(quantity) || parseInt(quantity) <= 0) {
-                    alert('❌ Số lượng không hợp lệ! Vui lòng nhập số dương.');
-                    return;
-                }
-                
-                const robuxAmount = parseInt(quantity);
-                
-                // Check stock
-                if (robuxAmount > ROBUX_STOCK) {
-                    alert(`❌ Số lượng vượt quá stock hiện có!\n\nStock còn lại: ${ROBUX_STOCK.toLocaleString()} Robux`);
-                    return;
-                }
-                
-                // Calculate price
-                const price = robuxAmount * ROBUX_RATE;
-                
-                // Check if user has enough money
-                if (price > currentBalance) {
-                    const shortage = price - currentBalance;
-                    alert(
-                        `❌ Số tiền không đủ!\n\n` +
-                        `💰 Số tiền hiện có: ${formatCurrency(currentBalance)}\n` +
-                        `💵 Số tiền cần: ${formatCurrency(price)}\n` +
-                        `⚠️ Thiếu: ${formatCurrency(shortage)}\n\n` +
-                        `Vui lòng nạp thêm tiền để tiếp tục mua hàng.`
+                // Check for pending transactions
+                if (hasPendingTransaction()) {
+                    showNotification(
+                        'Giao dịch đang chờ xử lý',
+                        'Bạn có giao dịch nạp tiền đang chờ xử lý. Vui lòng đợi giao dịch được xác nhận hoặc hủy trước khi mua Robux.',
+                        'warning',
+                        {
+                            buttons: [
+                                { text: 'Xem lịch sử', onclick: 'closeNotification(); openTransactionHistory();', class: 'notification-btn-primary' },
+                                { text: 'Đóng', onclick: 'closeNotification()', class: '' }
+                            ]
+                        }
                     );
                     return;
                 }
                 
-                // Confirm purchase
-                if (confirm(
-                    `Xác nhận mua Robux:\n\n` +
-                    `📦 Số lượng: ${robuxAmount.toLocaleString()} Robux\n` +
-                    `💵 Giá tiền: ${formatCurrency(price)}\n` +
-                    `💰 Số dư hiện tại: ${formatCurrency(currentBalance)}\n` +
-                    `💰 Số dư sau khi mua: ${formatCurrency(currentBalance - price)}`
-                )) {
-                    addRobuxToCartDirect(robuxAmount, price);
-                }
+                // Get current user balance from server
+                getCurrentBalance().then(currentBalance => {
+                    const maxAffordable = Math.floor(currentBalance / ROBUX_RATE);
+                    
+                    showRobuxPurchaseModal(currentBalance, maxAffordable);
+                }).catch(error => {
+                    console.error('Error getting balance:', error);
+                    // Fallback to local balance
+                    const currentBalance = userBalance;
+                    const maxAffordable = Math.floor(currentBalance / ROBUX_RATE);
+                    showRobuxPurchaseModal(currentBalance, maxAffordable);
+                });
             });
+        }
+        
+        function showRobuxPurchaseModal(currentBalance, maxAffordable) {
+            const content = `
+                <div class="robux-purchase-form">
+                    <div class="balance-info">
+                        <div class="balance-item">
+                            <i class="fas fa-wallet"></i>
+                            <div>
+                                <div class="balance-label">Số tiền hiện tại</div>
+                                <div class="balance-value">${formatCurrency(currentBalance)}</div>
+                            </div>
+                        </div>
+                        ${maxAffordable > 0 ? `
+                            <div class="balance-item">
+                                <i class="fas fa-chart-bar"></i>
+                                <div>
+                                    <div class="balance-label">Có thể mua tối đa</div>
+                                    <div class="balance-value">${maxAffordable.toLocaleString()} Robux</div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="balance-item warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <div>
+                                    <div class="balance-label">Không đủ tiền</div>
+                                    <div class="balance-value">Vui lòng nạp thêm</div>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                    <div class="input-group">
+                        <label>Số lượng Robux (1-${ROBUX_STOCK.toLocaleString()}):</label>
+                        <input type="number" id="robux-quantity-input" min="1" max="${ROBUX_STOCK}" value="1" oninput="updateRobuxPurchasePreview()">
+                    </div>
+                    <div class="purchase-preview" id="robux-purchase-preview">
+                        <div class="preview-item">
+                            <span>Số lượng:</span>
+                            <strong id="preview-quantity">1</strong> Robux
+                        </div>
+                        <div class="preview-item">
+                            <span>Giá tiền:</span>
+                            <strong id="preview-price">${formatCurrency(ROBUX_RATE)}</strong>
+                        </div>
+                        <div class="preview-item total">
+                            <span>Số dư sau khi mua:</span>
+                            <strong id="preview-balance">${formatCurrency(currentBalance - ROBUX_RATE)}</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            showNotification(
+                'Mua Robux',
+                content,
+                'info',
+                {
+                    buttons: [
+                        { 
+                            text: 'Xác nhận mua', 
+                            onclick: `confirmRobuxPurchase(${currentBalance})`, 
+                            class: 'notification-btn-primary' 
+                        },
+                        { text: 'Hủy', onclick: 'closeNotification()', class: '' }
+                    ]
+                }
+            );
+            
+            // Store current balance for preview
+            window.currentBalanceForPreview = currentBalance;
+            
+            // Update preview on input
+            document.getElementById('robux-quantity-input').addEventListener('input', updateRobuxPurchasePreview);
+        }
+        
+        function updateRobuxPurchasePreview() {
+            const input = document.getElementById('robux-quantity-input');
+            if (!input) return;
+            
+            const quantity = parseInt(input.value) || 1;
+            const price = quantity * ROBUX_RATE;
+            const currentBalance = window.currentBalanceForPreview || userBalance;
+            const newBalance = currentBalance - price;
+            
+            document.getElementById('preview-quantity').textContent = quantity.toLocaleString();
+            document.getElementById('preview-price').textContent = formatCurrency(price);
+            document.getElementById('preview-balance').textContent = formatCurrency(Math.max(0, newBalance));
+            
+            // Highlight if insufficient balance
+            const previewBalance = document.getElementById('preview-balance');
+            if (newBalance < 0) {
+                previewBalance.style.color = '#f44336';
+            } else {
+                previewBalance.style.color = '#4caf50';
+            }
+        }
+        
+        function confirmRobuxPurchase(currentBalance) {
+            const input = document.getElementById('robux-quantity-input');
+            if (!input) {
+                closeNotification();
+                return;
+            }
+            
+            const quantity = parseInt(input.value) || 0;
+            
+            if (quantity <= 0) {
+                showNotification('Lỗi', 'Vui lòng nhập số lượng hợp lệ!', 'error');
+                return;
+            }
+            
+            if (quantity > ROBUX_STOCK) {
+                showNotification(
+                    'Lỗi',
+                    `Số lượng vượt quá stock hiện có!\n\nStock còn lại: ${ROBUX_STOCK.toLocaleString()} Robux`,
+                    'error'
+                );
+                return;
+            }
+            
+            const price = quantity * ROBUX_RATE;
+            
+            if (price > currentBalance) {
+                const shortage = price - currentBalance;
+                showNotification(
+                    'Số tiền không đủ',
+                    `Số tiền hiện có: ${formatCurrency(currentBalance)}\n` +
+                    `Số tiền cần: ${formatCurrency(price)}\n` +
+                    `Thiếu: ${formatCurrency(shortage)}\n\n` +
+                    `Vui lòng nạp thêm tiền để tiếp tục.`,
+                    'error'
+                );
+                return;
+            }
+            
+            closeNotification();
+            addRobuxToCartDirect(quantity, price);
+            showNotification(
+                'Thành công',
+                `Đã thêm ${quantity.toLocaleString()} Robux vào giỏ hàng!\n\nGiá: ${formatCurrency(price)}`,
+                'success',
+                { timeout: 2000 }
+            );
+        }
+        
+        // Get balance from server (to prevent F12 manipulation)
+        async function getCurrentBalance() {
+            if (!currentUser) return 0;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(currentUser.email)}/balance`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update local balance
+                    userBalance = data.balance || 0;
+                    saveUserData();
+                    return userBalance;
+                }
+            } catch (error) {
+                console.error('Error fetching balance from server:', error);
+            }
+            
+            // Fallback to local balance
+            return userBalance;
+        }
+        
+        // Update balance on server
+        async function updateBalanceOnServer(newBalance) {
+            if (!currentUser) return;
+            
+            try {
+                await fetch(`${API_BASE_URL}/users/${encodeURIComponent(currentUser.email)}/balance`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ balance: newBalance })
+                });
+            } catch (error) {
+                console.error('Error updating balance on server:', error);
+            }
         }
         
         function openProductModal(productId) {
@@ -712,16 +941,43 @@
         }
         
         function addRobuxToCartDirect(robuxAmount, price) {
-            const robuxProduct = products.find(p => p.id === 'robux');
-            cart.push({
-                id: 'robux-' + Date.now(),
-                name: robuxProduct.name,
-                price: price,
-                quantity: 1,
-                robuxAmount: robuxAmount,
-                isCustomRobux: true
+            // Check balance from server before adding to cart
+            getCurrentBalance().then(currentBalance => {
+                if (price > currentBalance) {
+                    showNotification(
+                        'Số tiền không đủ',
+                        `Số tiền hiện có: ${formatCurrency(currentBalance)}\n` +
+                        `Số tiền cần: ${formatCurrency(price)}\n` +
+                        `Thiếu: ${formatCurrency(price - currentBalance)}`,
+                        'error'
+                    );
+                    return;
+                }
+                
+                const robuxProduct = products.find(p => p.id === 'robux');
+                cart.push({
+                    id: 'robux-' + Date.now(),
+                    name: robuxProduct.name,
+                    price: price,
+                    quantity: 1,
+                    robuxAmount: robuxAmount,
+                    isCustomRobux: true
+                });
+                updateCart();
+            }).catch(error => {
+                console.error('Error checking balance:', error);
+                // Fallback: add to cart anyway
+                const robuxProduct = products.find(p => p.id === 'robux');
+                cart.push({
+                    id: 'robux-' + Date.now(),
+                    name: robuxProduct.name,
+                    price: price,
+                    quantity: 1,
+                    robuxAmount: robuxAmount,
+                    isCustomRobux: true
+                });
+                updateCart();
             });
-            updateCart();
         }
         
         function updateRobuxPrice(productId) {
@@ -901,12 +1157,86 @@
             const message = encodeURIComponent(`Xin chào! Tôi muốn đặt hàng với mã đơn hàng: ${orderCode}`);
             facebookBtn.href = `${facebookLink}?text=${message}`;
             
-            // Send Discord webhook
-            sendDiscordWebhook(orderCode, cart, total);
-            
-            // Show modal
-            orderModal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
+            // Process order (check balance and deduct)
+            processOrder(orderCode, cart, total);
+        }
+        
+        async function processOrder(orderCode, cartItems, total) {
+            try {
+                // Check balance from server
+                const currentBalance = await getCurrentBalance();
+                
+                if (total > currentBalance) {
+                    showNotification(
+                        'Số tiền không đủ',
+                        `Số tiền hiện có: ${formatCurrency(currentBalance)}\n` +
+                        `Tổng đơn hàng: ${formatCurrency(total)}\n` +
+                        `Thiếu: ${formatCurrency(total - currentBalance)}`,
+                        'error'
+                    );
+                    return;
+                }
+                
+                // Deduct balance from server
+                const newBalance = currentBalance - total;
+                await updateBalanceOnServer(newBalance);
+                
+                // Update local balance
+                userBalance = newBalance;
+                saveUserData();
+                document.getElementById('user-balance').textContent = formatCurrency(userBalance);
+                
+                // Save order to allOrders for admin management
+                const orderData = {
+                    code: orderCode,
+                    userEmail: currentUser.email,
+                    userName: currentUser.name,
+                    items: cartItems.map(item => ({
+                        name: item.name[currentLanguage] || item.name.vi,
+                        price: item.price,
+                        quantity: item.quantity,
+                        robuxAmount: item.robuxAmount || null
+                    })),
+                    total: total,
+                    status: 'pending',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                allOrders.push(orderData);
+                localStorage.setItem('store_orders', JSON.stringify(allOrders));
+                
+                // Save order to server
+                await saveOrderToServer(orderData);
+                
+                // Send Discord webhook
+                sendDiscordWebhook(orderCode, cartItems, total);
+                
+                // Clear cart
+                cart = [];
+                updateCart();
+                
+                // Show order modal
+                const orderModal = document.getElementById('order-modal');
+                orderModal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+            } catch (error) {
+                console.error('Error processing order:', error);
+                showNotification('Lỗi', 'Không thể xử lý đơn hàng. Vui lòng thử lại!', 'error');
+            }
+        }
+        
+        // Save order to server
+        async function saveOrderToServer(orderData) {
+            try {
+                await fetch(`${API_BASE_URL}/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+            } catch (error) {
+                console.error('Error saving order to server:', error);
+            }
         }
         
         async function sendDiscordWebhook(orderCode, cartItems, total) {
@@ -1066,6 +1396,22 @@
         }
         
         function openTopUpModal() {
+            // Check for pending transactions
+            if (hasPendingTransaction()) {
+                showNotification(
+                    'Giao dịch đang chờ xử lý',
+                    'Bạn có giao dịch nạp tiền đang chờ xử lý. Vui lòng đợi giao dịch được xác nhận hoặc hủy trước khi tạo giao dịch mới.',
+                    'warning',
+                    {
+                        buttons: [
+                            { text: 'Xem lịch sử', onclick: 'closeNotification(); openTransactionHistory();', class: 'notification-btn-primary' },
+                            { text: 'Đóng', onclick: 'closeNotification()', class: '' }
+                        ]
+                    }
+                );
+                return;
+            }
+            
             const modal = document.getElementById('topup-modal');
             const randomCode = generateRandomCode();
             
@@ -1094,33 +1440,92 @@
         function confirmTopUp() {
             const amount = parseFloat(document.getElementById('topup-amount').value);
             if (amount < 10000) {
-                alert('Số tiền tối thiểu là 10,000₫');
+                showNotification('Lỗi', 'Số tiền tối thiểu là 10,000₫', 'error');
                 return;
             }
             
-            // Show waiting message
-            const message = `Đã ghi nhận yêu cầu nạp tiền ${formatCurrency(amount)}.\n\n` +
-                          `Đợi cho đến khi giao dịch của bạn được hoàn thành.\n\n` +
-                          `Chúng tôi sẽ xử lý và cập nhật số dư của bạn trong thời gian sớm nhất.`;
+            // Check for pending transactions again
+            if (hasPendingTransaction()) {
+                showNotification(
+                    'Giao dịch đang chờ xử lý',
+                    'Bạn có giao dịch nạp tiền đang chờ xử lý. Vui lòng đợi giao dịch được xác nhận hoặc hủy trước khi tạo giao dịch mới.',
+                    'warning',
+                    {
+                        buttons: [
+                            { text: 'Xem lịch sử', onclick: 'closeNotification(); closeTopUpModal(); openTransactionHistory();', class: 'notification-btn-primary' },
+                            { text: 'Đóng', onclick: 'closeNotification()', class: '' }
+                        ]
+                    }
+                );
+                return;
+            }
             
-            if (confirm(message)) {
-                // Save transaction to history
-                const transaction = {
-                    id: 'TXN-' + Date.now(),
-                    type: 'topup',
-                    amount: amount,
-                    status: 'pending', // pending, completed, cancelled
-                    createdAt: new Date().toISOString(),
-                    description: `Nạp tiền ${formatCurrency(amount)}`
-                };
-                
-                // Get user transactions
-                const userTransactions = JSON.parse(localStorage.getItem(`store_transactions_${currentUser.email}`) || '[]');
-                userTransactions.push(transaction);
-                localStorage.setItem(`store_transactions_${currentUser.email}`, JSON.stringify(userTransactions));
-                
-                closeTopUpModal();
-                alert('Yêu cầu nạp tiền đã được ghi nhận. Vui lòng đợi xử lý!');
+            // Show waiting notification
+            showNotification(
+                'Đã ghi nhận yêu cầu nạp tiền',
+                `Số tiền: ${formatCurrency(amount)}\n\n` +
+                `Đợi cho đến khi giao dịch của bạn được hoàn thành.\n\n` +
+                `Chúng tôi sẽ xử lý và cập nhật số dư của bạn trong thời gian sớm nhất.`,
+                'info',
+                {
+                    buttons: [
+                        { 
+                            text: 'Xác nhận', 
+                            onclick: `processTopUpRequest(${amount})`, 
+                            class: 'notification-btn-primary' 
+                        },
+                        { text: 'Hủy', onclick: 'closeNotification()', class: '' }
+                    ]
+                }
+            );
+        }
+        
+        function processTopUpRequest(amount) {
+            // Save transaction to history
+            const transaction = {
+                id: 'TXN-' + Date.now(),
+                type: 'topup',
+                amount: amount,
+                status: 'pending', // pending, completed, cancelled
+                createdAt: new Date().toISOString(),
+                description: `Nạp tiền ${formatCurrency(amount)}`
+            };
+            
+            // Get user transactions
+            const userTransactions = JSON.parse(localStorage.getItem(`store_transactions_${currentUser.email}`) || '[]');
+            userTransactions.push(transaction);
+            localStorage.setItem(`store_transactions_${currentUser.email}`, JSON.stringify(userTransactions));
+            
+            // Save to server (for admin to see)
+            saveTransactionToServer(transaction);
+            
+            closeNotification();
+            closeTopUpModal();
+            
+            showNotification(
+                'Thành công',
+                `Yêu cầu nạp tiền ${formatCurrency(amount)} đã được ghi nhận.\n\nVui lòng đợi admin xử lý!`,
+                'success',
+                { timeout: 3000 }
+            );
+        }
+        
+        // Save transaction to server
+        async function saveTransactionToServer(transaction) {
+            if (!currentUser) return;
+            
+            try {
+                await fetch(`${API_BASE_URL}/transactions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...transaction,
+                        userEmail: currentUser.email,
+                        userName: currentUser.name
+                    })
+                });
+            } catch (error) {
+                console.error('Error saving transaction to server:', error);
             }
         }
         
