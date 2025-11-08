@@ -2250,6 +2250,55 @@ main {
     font-size: 0.875rem;
 }
 
+.plan-robux-info {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.robux-amount {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+    text-align: center;
+    font-weight: 500;
+}
+
+.plan-buy-btn {
+    margin-top: 1.5rem;
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.plan-buy-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    background: linear-gradient(135deg, #45a049 0%, #388e3c 100%);
+}
+
+.plan-recommended .plan-buy-btn {
+    background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%);
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+}
+
+.plan-recommended .plan-buy-btn:hover {
+    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+    box-shadow: 0 6px 25px rgba(76, 175, 80, 0.5);
+}
+
 /* Subscription Confirmation Modal */
 .subscription-confirm-modal-overlay {
     display: none;
