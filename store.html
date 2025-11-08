@@ -3770,8 +3770,11 @@
                     return;
                 }
                 
+                // Clean transaction ID (remove any extra characters)
+                const cleanTransactionId = transactionId.split(':')[0].trim();
+                
                 // Update transaction status on server
-                const response = await fetch(`${API_BASE_URL}/transactions/${transactionId}`, {
+                const response = await fetch(`${API_BASE_URL}/transactions/${encodeURIComponent(cleanTransactionId)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3781,6 +3784,8 @@
                 });
                 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Transaction update error:', errorText);
                     throw new Error('Failed to update transaction');
                 }
                 
@@ -3828,8 +3833,11 @@
         
         async function confirmCancelTransaction(transactionId, userEmail) {
             try {
+                // Clean transaction ID (remove any extra characters)
+                const cleanTransactionId = transactionId.split(':')[0].trim();
+                
                 // Update transaction status on server
-                const response = await fetch(`${API_BASE_URL}/transactions/${transactionId}`, {
+                const response = await fetch(`${API_BASE_URL}/transactions/${encodeURIComponent(cleanTransactionId)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3839,6 +3847,8 @@
                 });
                 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Transaction cancel error:', errorText);
                     throw new Error('Failed to cancel transaction');
                 }
                 
