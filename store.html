@@ -3807,10 +3807,10 @@
                         </div>
                         ${transaction.status === 'pending' ? `
                             <div class="admin-transaction-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                                <button class="admin-btn-small admin-btn-success" onclick="adminCompleteTransaction('${transaction.id}', '${transaction.userEmail}')">
+                                <button class="admin-btn-small admin-btn-success" onclick="adminCompleteTransaction('${String(transaction.transactionId || transaction.id).split(':')[0].split('?')[0]}', '${transaction.userEmail}')">
                                     <i class="fas fa-check"></i> Xác nhận
                                 </button>
-                                <button class="admin-btn-small admin-btn-danger" onclick="adminCancelTransaction('${transaction.id}', '${transaction.userEmail}')">
+                                <button class="admin-btn-small admin-btn-danger" onclick="adminCancelTransaction('${String(transaction.transactionId || transaction.id).split(':')[0].split('?')[0]}', '${transaction.userEmail}')">
                                     <i class="fas fa-times"></i> Hủy
                                 </button>
                             </div>
@@ -3845,22 +3845,33 @@
         
         async function confirmCompleteTransaction(transactionId, userEmail) {
             try {
+                // Clean transaction ID FIRST (remove any extra characters like :1)
+                const cleanTransactionId = transactionId.split(':')[0].split('?')[0].trim();
+                
                 // Get transaction from local storage first to get amount
                 const userTransactions = JSON.parse(localStorage.getItem(`store_transactions_${userEmail}`) || '[]');
-                const transaction = userTransactions.find(t => t.id === transactionId);
+                // Try to find by clean ID first, then by original ID
+                let transaction = userTransactions.find(t => t.id === cleanTransactionId || t.transactionId === cleanTransactionId);
+                if (!transaction) {
+                    transaction = userTransactions.find(t => t.id === transactionId || t.transactionId === transactionId);
+                }
                 
                 if (!transaction) {
                     showNotification('Lỗi', 'Không tìm thấy giao dịch!', 'error');
                     return;
                 }
                 
-                // Clean transaction ID (remove any extra characters)
-                const cleanTransactionId = transactionId.split(':')[0].trim();
+                // Use the actual transaction ID from the transaction object
+                const actualTransactionId = transaction.transactionId || transaction.id || cleanTransactionId;
+                const finalCleanId = actualTransactionId.split(':')[0].split('?')[0].trim();
                 
                 // Update transaction status on server
-                const response = await fetch(`${API_BASE_URL}/transactions/${encodeURIComponent(cleanTransactionId)}`, {
+                const response = await fetch(`${API_BASE_URL}/transactions/${encodeURIComponent(finalCleanId)}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify({
                         status: 'completed',
                         userEmail: userEmail
@@ -3869,7 +3880,10 @@
                 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('Transaction update error:', errorText);
+                    // Only log if it's not HTML
+                    if (!errorText.includes('<!DOCTYPE')) {
+                        console.error('Transaction update error:', errorText);
+                    }
                     throw new Error('Failed to update transaction');
                 }
                 
@@ -3917,13 +3931,33 @@
         
         async function confirmCancelTransaction(transactionId, userEmail) {
             try {
-                // Clean transaction ID (remove any extra characters)
-                const cleanTransactionId = transactionId.split(':')[0].trim();
+                // Clean transaction ID FIRST (remove any extra characters like :1)
+                const cleanTransactionId = transactionId.split(':')[0].split('?')[0].trim();
+                
+                // Get transaction from local storage
+                const userTransactions = JSON.parse(localStorage.getItem(`store_transactions_${userEmail}`) || '[]');
+                // Try to find by clean ID first, then by original ID
+                let transaction = userTransactions.find(t => t.id === cleanTransactionId || t.transactionId === cleanTransactionId);
+                if (!transaction) {
+                    transaction = userTransactions.find(t => t.id === transactionId || t.transactionId === transactionId);
+                }
+                
+                if (!transaction) {
+                    showNotification('Lỗi', 'Không tìm thấy giao dịch!', 'error');
+                    return;
+                }
+                
+                // Use the actual transaction ID from the transaction object
+                const actualTransactionId = transaction.transactionId || transaction.id || cleanTransactionId;
+                const finalCleanId = actualTransactionId.split(':')[0].split('?')[0].trim();
                 
                 // Update transaction status on server
-                const response = await fetch(`${API_BASE_URL}/transactions/${encodeURIComponent(cleanTransactionId)}`, {
+                const response = await fetch(`${API_BASE_URL}/transactions/${encodeURIComponent(finalCleanId)}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
                     body: JSON.stringify({
                         status: 'cancelled',
                         userEmail: userEmail
@@ -3932,13 +3966,12 @@
                 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('Transaction cancel error:', errorText);
+                    // Only log if it's not HTML
+                    if (!errorText.includes('<!DOCTYPE')) {
+                        console.error('Transaction cancel error:', errorText);
+                    }
                     throw new Error('Failed to cancel transaction');
                 }
-                
-                // Update local storage
-                const userTransactions = JSON.parse(localStorage.getItem(`store_transactions_${userEmail}`) || '[]');
-                const transaction = userTransactions.find(t => t.id === transactionId);
                 
                 if (transaction) {
                     transaction.status = 'cancelled';
