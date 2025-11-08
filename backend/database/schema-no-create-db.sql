@@ -1,10 +1,7 @@
--- MySQL Database Schema for Store Application
--- Run this SQL script in your Hostinger MySQL database
--- 
--- QUAN TRỌNG: 
--- 1. Database đã được tạo sẵn trong Hostinger (ví dụ: u912867947_databases)
--- 2. Chọn database từ menu bên trái trong phpMyAdmin TRƯỚC KHI chạy script này
--- 3. KHÔNG cần CREATE DATABASE - chỉ chạy các CREATE TABLE statements
+-- MySQL Database Schema for Store Application (Hostinger)
+-- Run this SQL script AFTER selecting your database in phpMyAdmin
+-- Database should already exist (e.g., u912867947_databases)
+-- DO NOT run CREATE DATABASE - just run the CREATE TABLE statements below
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

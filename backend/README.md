@@ -33,19 +33,38 @@ npm install
 
 ### 4. Cấu Hình Environment Variables
 
-Tạo file `.env` trong thư mục `backend/`:
+**Lấy thông tin từ Hostinger:**
+1. Đăng nhập Hostinger Control Panel
+2. Vào **MySQL Databases**
+3. Ghi lại:
+   - Database Name (ví dụ: `u912867947_databases`)
+   - MySQL User (ví dụ: `u912867947_admin`)
+   - MySQL Password
+   - Host (thường là `localhost`)
+
+**Tạo file `.env` trong thư mục `backend/`:**
+
+Copy từ `.env.example`:
+```bash
+cd backend
+cp .env.example .env
+```
+
+Sau đó chỉnh sửa file `.env` với thông tin thực tế:
 
 ```env
 # MySQL Database Configuration (Hostinger)
 DB_HOST=localhost
-DB_USER=your_mysql_username
-DB_PASSWORD=your_mysql_password
-DB_NAME=store_db
+DB_USER=u912867947_admin
+DB_PASSWORD=your_actual_password
+DB_NAME=u912867947_databases
 DB_PORT=3306
 
 # Server Port
 PORT=3000
 ```
+
+**Xem hướng dẫn chi tiết trong file `HOSTINGER_SETUP.md`**
 
 ### 5. Chạy Server
 
