@@ -1494,35 +1494,53 @@
             }
             
             try {
-                const email = encodeURIComponent(currentUser.email);
+                // Clean email - remove any extra characters
+                const cleanEmail = currentUser.email.trim().split(':')[0].split('?')[0];
+                const email = encodeURIComponent(cleanEmail);
                 const url = `${API_BASE_URL}/users/balance?email=${email}`;
                 console.log('Fetching balance from server:', url);
-                const response = await fetch(url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    const serverBalance = parseFloat(data.balance) || 0;
-                    console.log('✅ Balance from server:', serverBalance);
-                    
-                    // Update local balance
-                    userBalance = serverBalance;
-                    localStorage.setItem('store_balance', userBalance.toString());
-                    saveUserData();
-                    
-                    // Update UI
-                    const balanceEl = document.getElementById('user-balance');
-                    if (balanceEl) {
-                        balanceEl.textContent = formatCurrency(userBalance);
-                        console.log('Balance UI updated:', userBalance);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        const serverBalance = parseFloat(data.balance) || 0;
+                        console.log('✅ Balance from server:', serverBalance);
+                        
+                        // Update local balance
+                        userBalance = serverBalance;
+                        localStorage.setItem('store_balance', userBalance.toString());
+                        saveUserData();
+                        
+                        // Update UI
+                        const balanceEl = document.getElementById('user-balance');
+                        if (balanceEl) {
+                            balanceEl.textContent = formatCurrency(userBalance);
+                            console.log('Balance UI updated:', userBalance);
+                        } else {
+                            console.warn('Balance element not found when updating');
+                        }
+                        
+                        return userBalance;
                     } else {
-                        console.warn('Balance element not found when updating');
+                        console.warn('Response is not JSON, content-type:', contentType);
+                        throw new Error('Invalid response format');
                     }
-                    
-                    return userBalance;
                 } else {
                     console.warn('Failed to fetch balance, status:', response.status);
                     const errorText = await response.text();
-                    console.warn('Error response:', errorText);
+                    // Only log if it's not HTML
+                    if (!errorText.includes('<!DOCTYPE')) {
+                        console.warn('Error response:', errorText);
+                    }
                     
                     // Try to use localStorage as fallback
                     const savedBalance = localStorage.getItem('store_balance');
@@ -2448,20 +2466,36 @@
                 
                 // Load balance from server first, then fallback to localStorage
                 try {
-                    const email = encodeURIComponent(user.email);
-                    const balanceResponse = await fetch(`${API_BASE_URL}/users/balance?email=${email}`);
+                    // Clean email - remove any extra characters
+                    const cleanEmail = user.email.trim().split(':')[0].split('?')[0];
+                    const email = encodeURIComponent(cleanEmail);
+                    const balanceResponse = await fetch(`${API_BASE_URL}/users/balance?email=${email}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    });
                     console.log('Balance API response status:', balanceResponse.status);
                     
                     if (balanceResponse.ok) {
-                        const balanceData = await balanceResponse.json();
-                        userBalance = parseFloat(balanceData.balance) || 0;
-                        console.log('✅ Balance loaded from server:', userBalance);
-                        
-                        // Save to localStorage
-                        localStorage.setItem('store_balance', userBalance.toString());
+                        const contentType = balanceResponse.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            const balanceData = await balanceResponse.json();
+                            userBalance = parseFloat(balanceData.balance) || 0;
+                            console.log('✅ Balance loaded from server:', userBalance);
+                            
+                            // Save to localStorage
+                            localStorage.setItem('store_balance', userBalance.toString());
+                        } else {
+                            throw new Error('Invalid response format');
+                        }
                     } else {
                         const errorText = await balanceResponse.text();
-                        console.warn('Failed to fetch balance from server:', errorText);
+                        // Only log if it's not HTML
+                        if (!errorText.includes('<!DOCTYPE')) {
+                            console.warn('Failed to fetch balance from server:', errorText);
+                        }
                         // Fallback to localStorage
                         const savedBalance = localStorage.getItem('store_balance');
                         userBalance = savedBalance ? parseFloat(savedBalance) : 0;
@@ -2986,12 +3020,23 @@
             if (!currentUser || !currentUser.email) return;
             
             try {
-                const email = encodeURIComponent(currentUser.email);
-                const response = await fetch(`${API_BASE_URL}/marketplace?sellerEmail=${email}`);
+                // Clean email - remove any extra characters
+                const cleanEmail = currentUser.email.trim().split(':')[0].split('?')[0];
+                const email = encodeURIComponent(cleanEmail);
+                const response = await fetch(`${API_BASE_URL}/marketplace?sellerEmail=${email}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
                 if (response.ok) {
-                    const data = await response.json();
-                    const items = data.items || [];
-                    renderMyMarketplaceItems(items);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        const items = data.items || [];
+                        renderMyMarketplaceItems(items);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading my marketplace items:', error);
@@ -3028,27 +3073,38 @@
             // Load subscription and gamepass
             if (currentUser && currentUser.email) {
                 try {
-                    const email = encodeURIComponent(currentUser.email);
-                    const subResponse = await fetch(`${API_BASE_URL}/subscriptions?email=${email}`);
+                    // Clean email - remove any extra characters
+                    const cleanEmail = currentUser.email.trim().split(':')[0].split('?')[0];
+                    const email = encodeURIComponent(cleanEmail);
+                    const subResponse = await fetch(`${API_BASE_URL}/subscriptions?email=${email}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    });
                     if (subResponse.ok) {
-                        const subData = await subResponse.json();
-                        if (subData.subscription) {
-                            const planPrice = subData.subscription.planPrice;
-                            const maxGamepass = planPrice === 100000 ? 3 : planPrice === 300000 ? 5 : planPrice === 500000 ? 7 : 0;
-                            
-                            const infoEl = document.getElementById('gamepass-info');
-                            if (infoEl) {
-                                infoEl.textContent = `Bạn đang sử dụng gói ${formatCurrency(planPrice)}/tháng. Bạn có thể thêm tối đa ${maxGamepass} gamepass.`;
+                        const contentType = subResponse.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            const subData = await subResponse.json();
+                            if (subData.subscription) {
+                                const planPrice = subData.subscription.planPrice;
+                                const maxGamepass = planPrice === 100000 ? 3 : planPrice === 300000 ? 5 : planPrice === 500000 ? 7 : 0;
+                                
+                                const infoEl = document.getElementById('gamepass-info');
+                                if (infoEl) {
+                                    infoEl.textContent = `Bạn đang sử dụng gói ${formatCurrency(planPrice)}/tháng. Bạn có thể thêm tối đa ${maxGamepass} gamepass.`;
+                                }
+                                
+                                // Load gamepasses
+                                loadGamepasses(maxGamepass);
+                            } else {
+                                const infoEl = document.getElementById('gamepass-info');
+                                if (infoEl) {
+                                    infoEl.textContent = 'Bạn chưa đăng ký gói Robux tự động. Vui lòng đăng ký để sử dụng tính năng này.';
+                                }
+                                document.getElementById('add-gamepass-btn').style.display = 'none';
                             }
-                            
-                            // Load gamepasses
-                            loadGamepasses(maxGamepass);
-                        } else {
-                            const infoEl = document.getElementById('gamepass-info');
-                            if (infoEl) {
-                                infoEl.textContent = 'Bạn chưa đăng ký gói Robux tự động. Vui lòng đăng ký để sử dụng tính năng này.';
-                            }
-                            document.getElementById('add-gamepass-btn').style.display = 'none';
                         }
                     }
                 } catch (error) {
@@ -3062,33 +3118,50 @@
             if (!gamepassList) return;
             
             try {
-                const email = encodeURIComponent(currentUser.email);
-                const response = await fetch(`${API_BASE_URL}/users/gamepasses?email=${email}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const gamepasses = data.gamepasses || [];
-                    
-                    if (gamepasses.length >= maxGamepass) {
-                        document.getElementById('add-gamepass-btn').style.display = 'none';
-                    } else {
-                        document.getElementById('add-gamepass-btn').style.display = 'block';
+                // Clean email - remove any extra characters
+                const cleanEmail = currentUser.email.trim().split(':')[0].split('?')[0];
+                const email = encodeURIComponent(cleanEmail);
+                const response = await fetch(`${API_BASE_URL}/users/gamepasses?email=${email}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     }
-                    
-                    gamepassList.innerHTML = gamepasses.map((gp, index) => `
-                        <div class="gamepass-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 0.5rem; margin-bottom: 0.5rem;">
-                            <div style="flex: 1;">
-                                <strong>Gamepass ${index + 1}:</strong>
-                                <a href="${gp.link}" target="_blank" style="color: #4caf50; text-decoration: none; margin-left: 0.5rem;">${gp.link}</a>
-                            </div>
-                            <button class="admin-btn-small" style="background: #f44336;" onclick="removeGamepass('${gp._id}')">
-                                <i class="fas fa-trash"></i> Xóa
-                            </button>
-                        </div>
-                    `).join('');
+                });
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        const gamepasses = data.gamepasses || [];
+                        renderGamepasses(gamepasses, maxGamepass);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading gamepasses:', error);
             }
+        }
+        
+        function renderGamepasses(gamepasses, maxGamepass) {
+            const gamepassList = document.getElementById('gamepass-list');
+            if (!gamepassList) return;
+            
+            if (gamepasses.length >= maxGamepass) {
+                document.getElementById('add-gamepass-btn').style.display = 'none';
+            } else {
+                document.getElementById('add-gamepass-btn').style.display = 'block';
+            }
+            
+            gamepassList.innerHTML = gamepasses.map((gp, index) => `
+                <div class="gamepass-item" style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 0.5rem; margin-bottom: 0.5rem;">
+                    <div style="flex: 1;">
+                        <strong>Gamepass ${index + 1}:</strong>
+                        <a href="${gp.link}" target="_blank" style="color: #4caf50; text-decoration: none; margin-left: 0.5rem;">${gp.link}</a>
+                    </div>
+                    <button class="admin-btn-small" style="background: #f44336;" onclick="removeGamepass('${gp._id}')">
+                        <i class="fas fa-trash"></i> Xóa
+                    </button>
+                </div>
+            `).join('');
         }
         
         function addGamepassLink() {
@@ -3525,12 +3598,23 @@
         // Check if user is blacklisted
         async function checkBlacklist(email) {
             try {
-                const emailEncoded = encodeURIComponent(email);
-                const response = await fetch(`${API_BASE_URL}/users/blacklist?email=${emailEncoded}`);
+                // Clean email - remove any extra characters
+                const cleanEmail = email.trim().split(':')[0].split('?')[0];
+                const emailEncoded = encodeURIComponent(cleanEmail);
+                const response = await fetch(`${API_BASE_URL}/users/blacklist?email=${emailEncoded}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    return data.isBlacklisted || false;
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        return data.isBlacklisted || false;
+                    }
                 }
                 return false;
             } catch (error) {
@@ -4183,27 +4267,38 @@
             if (!currentUser || !currentUser.email) return;
             
             try {
-                const email = encodeURIComponent(currentUser.email);
-                const response = await fetch(`${API_BASE_URL}/subscriptions?action=check-renewal&email=${email}`);
+                // Clean email - remove any extra characters
+                const cleanEmail = currentUser.email.trim().split(':')[0].split('?')[0];
+                const email = encodeURIComponent(cleanEmail);
+                const response = await fetch(`${API_BASE_URL}/subscriptions?action=check-renewal&email=${email}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    if (data.renewed) {
-                        showNotification(
-                            'Gia hạn tự động',
-                            `Gói Robux tự động của bạn đã được gia hạn tự động!\n\n` +
-                            `Số tiền đã trừ: ${formatCurrency(data.amount)}\n` +
-                            `Số dư còn lại: ${formatCurrency(data.newBalance)}`,
-                            'success',
-                            { timeout: 5000 }
-                        );
-                        
-                        // Update balance in UI
-                        userBalance = data.newBalance;
-                        saveUserData();
-                        const balanceEl = document.getElementById('user-balance');
-                        if (balanceEl) {
-                            balanceEl.textContent = formatCurrency(userBalance);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (data.renewed) {
+                            showNotification(
+                                'Gia hạn tự động',
+                                `Gói Robux tự động của bạn đã được gia hạn tự động!\n\n` +
+                                `Số tiền đã trừ: ${formatCurrency(data.amount)}\n` +
+                                `Số dư còn lại: ${formatCurrency(data.newBalance)}`,
+                                'success',
+                                { timeout: 5000 }
+                            );
+                            
+                            // Update balance in UI
+                            userBalance = data.newBalance;
+                            saveUserData();
+                            const balanceEl = document.getElementById('user-balance');
+                            if (balanceEl) {
+                                balanceEl.textContent = formatCurrency(userBalance);
+                            }
                         }
                     }
                 }
