@@ -8,11 +8,37 @@
     <meta name="og:description" content="Cửa hàng chuyên cung cấp các dịch vụ Script Roblox: Mua script, Fix script, Làm script theo yêu cầu.">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cửa Hàng Script Roblox - Mua Script, Fix Script, Làm Script</title>
+    <title>Cửa Hàng Script Roblox </title>
     <link rel="stylesheet" href="store-styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Appwrite SDK using ES modules -->
+    <script type="module">
+        import { Client, Account, OAuthProvider } from 'https://cdn.jsdelivr.net/npm/appwrite@16.0.2/+esm';
+        
+        // Appwrite configuration
+        const APPWRITE_ENDPOINT = 'https://sgp.cloud.appwrite.io/v1';
+        const APPWRITE_PROJECT_ID = '690ec5bf00043292a7e0';
+        
+        // Initialize Appwrite client and account
+        const appwriteClient = new Client()
+            .setEndpoint(APPWRITE_ENDPOINT)
+            .setProject(APPWRITE_PROJECT_ID);
+        
+        const appwriteAccount = new Account(appwriteClient);
+        
+        // Expose to global scope for use in other scripts
+        window.AppwriteSDK = {
+            Client,
+            Account,
+            OAuthProvider,
+            client: appwriteClient,
+            account: appwriteAccount
+        };
+        
+        window.appwriteSDKLoaded = true;
+        console.log('Appwrite SDK loaded successfully using ES modules');
+    </script>
 </head>
 
 <body>
@@ -158,6 +184,15 @@
         </div>
 
         <div class="products-title" id="products" data-i18n="products.title">Sản Phẩm</div>
+        
+        <!-- Product Categories -->
+        <div class="product-categories">
+            <button class="category-btn active" data-category="all">Tất Cả</button>
+            <button class="category-btn" data-category="robux">Robux</button>
+            <button class="category-btn" data-category="account">Tài Khoản</button>
+            <button class="category-btn" data-category="farming">Cày Thuê</button>
+        </div>
+        
         <section class="products-grid" id="products-grid">
             <!-- Products will be loaded dynamically -->
         </section>
@@ -240,30 +275,41 @@
         const ROBUX_RATE = 125; // 1 Robux = 125 VND
         const ROBUX_STOCK = 10000; // 10k Robux available
         
+        // MongoDB API endpoint (Vercel serverless function)
+        const API_BASE_URL = 'https://your-vercel-app.vercel.app/api'; // Replace with your Vercel API URL
+        
         const products = [
             {
-                id: 'robux-custom',
-                name: { vi: "Mua Robux (Tùy Chỉnh)", en: "Buy Robux (Custom)" },
-                description: { vi: `Mua Robux theo số lượng bạn muốn. Rate: ${ROBUX_RATE}₫/Robux. Stock: ${ROBUX_STOCK.toLocaleString()} Robux`, en: `Buy Robux in any amount. Rate: ${ROBUX_RATE}₫/Robux. Stock: ${ROBUX_STOCK.toLocaleString()} Robux` },
-                price: 0, // Will be calculated based on quantity
+                id: 'robux',
+                category: 'robux',
+                name: { vi: "Robux", en: "Robux" },
+                description: { vi: `Mua Robux theo số lượng bạn muốn. Rate: ${ROBUX_RATE}₫/Robux`, en: `Buy Robux in any amount. Rate: ${ROBUX_RATE}₫/Robux` },
+                price: 0,
                 icon: "fas fa-coins",
                 isCustomRobux: true,
                 rate: ROBUX_RATE,
-                stock: ROBUX_STOCK
+                stock: ROBUX_STOCK,
+                stockDisplay: true
             },
             {
-                id: 5,
-                name: { vi: "Vật Phẩm Game", en: "Game Items" },
-                description: { vi: "Các vật phẩm độc đáo trong game Roblox", en: "Unique items in Roblox games" },
-                price: 100000,
-                icon: "fas fa-gem"
+                id: 'account',
+                category: 'account',
+                name: { vi: "Tài Khoản", en: "Account" },
+                description: { vi: "Tài khoản Roblox với các vật phẩm độc đáo", en: "Roblox accounts with unique items" },
+                price: 0,
+                icon: "fas fa-user",
+                stock: 0,
+                stockDisplay: true
             },
             {
-                id: 6,
-                name: { vi: "Premium Pass", en: "Premium Pass" },
-                description: { vi: "Premium Pass cho các game phổ biến", en: "Premium Pass for popular games" },
-                price: 150000,
-                icon: "fas fa-crown"
+                id: 'farming',
+                category: 'farming',
+                name: { vi: "Cày Thuê", en: "Farming Service" },
+                description: { vi: "Dịch vụ cày thuê game Roblox theo yêu cầu", en: "Roblox farming service on demand" },
+                price: 0,
+                icon: "fas fa-tractor",
+                stock: 0,
+                stockDisplay: true
             }
         ];
         
@@ -274,11 +320,34 @@
         let currentUser = null;
         let userBalance = 0;
         
+        // Appwrite references (initialized in module script above)
+        let client, account;
+        let buttonsRendered = false; // Flag to prevent multiple renders
+        
+        function initializeAppwrite() {
+            // Check if Appwrite SDK is loaded
+            if (!window.appwriteSDKLoaded || !window.AppwriteSDK) {
+                return false;
+            }
+            
+            // Use the pre-initialized client and account from the module
+            client = window.AppwriteSDK.client;
+            account = window.AppwriteSDK.account;
+            
+            if (!client || !account) {
+                console.warn('Appwrite client or account not available');
+                return false;
+            }
+            
+            console.log('Appwrite initialized successfully');
+            return true;
+        }
+        
         // Bank info for top-up (replace with your actual info)
         const BANK_INFO = {
-            bankName: 'Vietcombank',
-            accountNumber: '1234567890',
-            accountName: 'NGUYEN VAN A',
+            bankName: 'MBBANK',
+            accountNumber: '866613102008',
+            accountName: 'DUONG GIA KHIEM',
             qrCodeUrl: 'https://via.placeholder.com/300x300?text=QR+Code' // Replace with your QR code image URL
         };
 
@@ -381,53 +450,137 @@
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
         }
 
-        function renderProducts() {
+        let currentCategory = 'all';
+        
+        // Load stock from MongoDB
+        async function loadStockFromDB() {
+            // Skip if API URL is not configured
+            if (!API_BASE_URL || API_BASE_URL.includes('your-vercel-app')) {
+                console.log('API not configured, using default stock values');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/stock`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update products stock from database
+                    products.forEach(product => {
+                        if (data[product.id]) {
+                            product.stock = data[product.id].stock || product.stock;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.log('Failed to load stock from DB, using default values:', error);
+            }
+        }
+        
+        // Save user data to MongoDB
+        async function saveUserToDB(userData) {
+            try {
+                await fetch(`${API_BASE_URL}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+            } catch (error) {
+                console.error('Failed to save user:', error);
+            }
+        }
+        
+        function renderProducts(category = 'all') {
             const productsGrid = document.getElementById('products-grid');
-            productsGrid.innerHTML = products.map(product => {
+            const filteredProducts = category === 'all' 
+                ? products 
+                : products.filter(p => p.category === category);
+            
+            if (filteredProducts.length === 0) {
+                productsGrid.innerHTML = '<p class="no-products">Không có sản phẩm nào</p>';
+                return;
+            }
+            
+            productsGrid.innerHTML = filteredProducts.map(product => {
                 const name = product.name[currentLanguage] || product.name.vi;
                 const description = product.description[currentLanguage] || product.description.vi;
                 
                 if (product.isCustomRobux) {
+                    const stockText = product.stock > 0 ? product.stock.toLocaleString() : 'Hết hàng';
                     return `
-                        <div class="product-card robux-custom-card">
-                            <div class="product-icon">
-                                <i class="${product.icon}"></i>
+                        <div class="product-card robux-custom-card clickable-card" data-category="${product.category}" onclick="openRobuxModal()">
+                            <div class="product-header">
+                                <div class="product-icon">
+                                    <i class="${product.icon}"></i>
+                                </div>
+                                <h3 class="product-name">${name}</h3>
                             </div>
-                            <h3 class="product-name">${name}</h3>
-                            <p class="product-description">${description}</p>
-                            <div class="robux-input-section">
-                                <label>Số lượng Robux:</label>
-                                <input type="number" id="robux-quantity-${product.id}" 
-                                       min="1" max="${product.stock}" 
-                                       value="100" 
-                                       class="robux-quantity-input"
-                                       onchange="updateRobuxPrice('${product.id}')">
-                                <div class="robux-price-display" id="robux-price-${product.id}">
-                                    ${formatCurrency(100 * product.rate)}
+                            <div class="product-content">
+                                <p class="product-description">${description}</p>
+                                <div class="product-info-row">
+                                    <span class="product-rate">Rate: ${product.rate}₫</span>
+                                </div>
+                                <div class="product-stock-row">
+                                    <span class="product-stock">Còn lại: ${stockText}</span>
                                 </div>
                             </div>
-                            <button class="product-btn" onclick="addRobuxToCart('${product.id}')" data-i18n="cart.add">
-                                <i class="fas fa-cart-plus"></i> Thêm vào giỏ
-                            </button>
                         </div>
                     `;
                 }
                 
+                const stockText = product.stockDisplay && product.stock !== undefined 
+                    ? (product.stock > 0 ? product.stock.toLocaleString() : 'Hết hàng')
+                    : '';
+                
                 return `
-                    <div class="product-card">
-                        <div class="product-icon">
-                            <i class="${product.icon}"></i>
+                    <div class="product-card clickable-card" data-category="${product.category}" onclick="openProductModal('${product.id}')">
+                        <div class="product-header">
+                            <div class="product-icon">
+                                <i class="${product.icon}"></i>
+                            </div>
+                            <h3 class="product-name">${name}</h3>
                         </div>
-                        <h3 class="product-name">${name}</h3>
-                        <p class="product-description">${description}</p>
-                        <div class="product-price">${formatCurrency(product.price)}</div>
-                        <button class="product-btn" onclick="addToCart(${typeof product.id === 'string' ? `'${product.id}'` : product.id})" data-i18n="cart.add">
-                            <i class="fas fa-cart-plus"></i> Thêm vào giỏ
-                        </button>
+                        <div class="product-content">
+                            <p class="product-description">${description}</p>
+                            ${stockText ? `<div class="product-stock-row"><span class="product-stock">Còn lại: ${stockText}</span></div>` : ''}
+                        </div>
                     </div>
                 `;
             }).join('');
             applyTranslations();
+        }
+        
+        function openRobuxModal() {
+            checkLoginBeforeAction(() => {
+                const quantity = prompt('Nhập số lượng Robux bạn muốn mua (1-' + ROBUX_STOCK.toLocaleString() + '):');
+                if (quantity && !isNaN(quantity) && parseInt(quantity) > 0 && parseInt(quantity) <= ROBUX_STOCK) {
+                    const robuxAmount = parseInt(quantity);
+                    const price = robuxAmount * ROBUX_RATE;
+                    if (confirm(`Bạn muốn mua ${robuxAmount.toLocaleString()} Robux với giá ${formatCurrency(price)}?`)) {
+                        addRobuxToCartDirect(robuxAmount, price);
+                    }
+                } else if (quantity) {
+                    alert('Số lượng không hợp lệ!');
+                }
+            });
+        }
+        
+        function openProductModal(productId) {
+            checkLoginBeforeAction(() => {
+                alert('Tính năng đang được phát triển. Vui lòng liên hệ qua Facebook để đặt hàng.');
+            });
+        }
+        
+        function addRobuxToCartDirect(robuxAmount, price) {
+            const robuxProduct = products.find(p => p.id === 'robux');
+            cart.push({
+                id: 'robux-' + Date.now(),
+                name: robuxProduct.name,
+                price: price,
+                quantity: 1,
+                robuxAmount: robuxAmount,
+                isCustomRobux: true
+            });
+            updateCart();
         }
         
         function updateRobuxPrice(productId) {
@@ -680,16 +833,30 @@
         }
         
         // User management functions
-        function loadUserData() {
-            const savedUser = localStorage.getItem('store_user');
-            const savedBalance = localStorage.getItem('store_balance');
+        async function loadUserData() {
+            // First check Appwrite session
+            await checkUserSession();
             
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                userBalance = savedBalance ? parseFloat(savedBalance) : 0;
-                showUserMenu();
-            } else {
-                showLoginButton();
+            // If no Appwrite session, check localStorage
+            if (!currentUser) {
+                const savedUser = localStorage.getItem('store_user');
+                const savedBalance = localStorage.getItem('store_balance');
+                
+                if (savedUser) {
+                    currentUser = JSON.parse(savedUser);
+                    userBalance = savedBalance ? parseFloat(savedBalance) : 0;
+                    showUserMenu();
+                } else {
+                    showLoginButton();
+                }
+            }
+            
+            // Handle OAuth callback if present
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('error') === 'auth_failed') {
+                alert('Đăng nhập thất bại. Vui lòng thử lại.');
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
         }
         
@@ -701,19 +868,40 @@
         }
         
         function showUserMenu() {
-            document.getElementById('user-menu-container').style.display = 'block';
-            document.getElementById('google-signin-container').style.display = 'none';
-            document.getElementById('user-name').textContent = currentUser.name || currentUser.email;
-            document.getElementById('user-balance').textContent = formatCurrency(userBalance);
+            const userMenuContainer = document.getElementById('user-menu-container');
+            const signinContainer = document.getElementById('google-signin-container');
+            
+            if (userMenuContainer) userMenuContainer.style.display = 'block';
+            if (signinContainer) signinContainer.style.display = 'none';
+            
+            const userNameEl = document.getElementById('user-name');
+            const userBalanceEl = document.getElementById('user-balance');
+            if (userNameEl) userNameEl.textContent = currentUser.name || currentUser.email;
+            if (userBalanceEl) userBalanceEl.textContent = formatCurrency(userBalance);
         }
         
         function showLoginButton() {
-            document.getElementById('user-menu-container').style.display = 'none';
-            document.getElementById('google-signin-container').style.display = 'block';
-            initializeGoogleSignIn();
+            const userMenuContainer = document.getElementById('user-menu-container');
+            const signinContainer = document.getElementById('google-signin-container');
+            
+            if (userMenuContainer) userMenuContainer.style.display = 'none';
+            if (signinContainer) {
+                signinContainer.style.display = 'flex'; // Use flex to match CSS
+                // Ensure button is rendered (only if not already rendered)
+                if (!buttonsRendered) {
+                    initializeGoogleSignIn();
+                }
+            }
         }
         
-        function logout() {
+        async function logout() {
+            try {
+                if (account) {
+                    await account.deleteSession('current');
+                }
+            } catch (error) {
+                console.error('Error logging out from Appwrite:', error);
+            }
             currentUser = null;
             userBalance = 0;
             localStorage.removeItem('store_user');
@@ -780,47 +968,158 @@
         }
         
         function initializeGoogleSignIn() {
-            // Wait for Google Sign-In to load
-            if (typeof google === 'undefined') {
-                setTimeout(initializeGoogleSignIn, 100);
+            // Render sign-in buttons only once
+            if (!buttonsRendered) {
+                renderGoogleSignInButton('google-signin-container');
+                renderGoogleSignInButton('google-signin-modal');
+                buttonsRendered = true;
+            }
+            
+            // Try to initialize Appwrite if not already done
+            if (!account) {
+                const initialized = initializeAppwrite();
+                if (!initialized) {
+                    // Wait for Appwrite SDK to load
+                    setTimeout(initializeGoogleSignIn, 100);
+                    return;
+                }
+            }
+            
+            // Check if user is already logged in
+            if (account) {
+                checkUserSession();
+            }
+        }
+        
+        function renderGoogleSignInButton(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) {
                 return;
             }
             
-            google.accounts.id.initialize({
-                client_id: 'YOUR_GOOGLE_CLIENT_ID_HERE', // Replace with your Google Client ID
-                callback: handleCredentialResponse,
-                auto_select: false
-            });
+            // Ensure container is visible
+            if (containerId === 'google-signin-container') {
+                container.style.display = 'flex';
+            }
             
-            google.accounts.id.renderButton(
-                document.getElementById('google-signin-container'),
-                { theme: 'outline', size: 'large', text: 'signin_with', locale: 'vi' }
-            );
+            // Clear existing content
+            container.innerHTML = '';
             
-            google.accounts.id.renderButton(
-                document.getElementById('google-signin-modal'),
-                { theme: 'outline', size: 'large', text: 'signin_with', locale: 'vi' }
-            );
+            // Create button
+            const button = document.createElement('button');
+            button.className = 'google-signin-btn';
+            button.type = 'button'; // Prevent form submission
+            button.innerHTML = `
+                <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="#000" fill-rule="evenodd">
+                        <path d="M9 3.48c1.69 0 2.83.73 3.48 1.34l2.54-2.48C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l2.91 2.26C4.6 5.05 6.62 3.48 9 3.48z" fill="#EA4335"/>
+                        <path d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.21 1.18-.84 2.18-1.79 2.91l2.78 2.15c2.17-2 3.69-4.94 3.69-8.56z" fill="#4285F4"/>
+                        <path d="M3.88 10.78A5.54 5.54 0 0 1 3.58 9c0-.62.11-1.22.29-1.78L.96 4.96A9.008 9.008 0 0 0 0 9c0 1.45.35 2.82.96 4.04l2.92-2.26z" fill="#FBBC05"/>
+                        <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.78-2.15c-.76.53-1.78.9-3.18.9-2.38 0-4.4-1.57-5.12-3.74L.96 13.04C2.45 15.98 5.48 18 9 18z" fill="#34A853"/>
+                    </g>
+                </svg>
+                <span>Đăng nhập với Google</span>
+            `;
+            button.onclick = handleGoogleSignIn;
+            container.appendChild(button);
         }
         
-        function handleCredentialResponse(response) {
-            // Decode JWT token (in production, verify on server)
-            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+        async function handleGoogleSignIn() {
+            // Check if Appwrite SDK is loaded
+            if (!window.AppwriteSDK || !window.appwriteSDKLoaded) {
+                alert('Appwrite SDK chưa được tải. Vui lòng:\n1. Kiểm tra kết nối internet\n2. Làm mới trang và đợi một chút\n3. Kiểm tra Console (F12) để xem lỗi');
+                return;
+            }
             
-            currentUser = {
-                email: payload.email,
-                name: payload.name,
-                picture: payload.picture,
-                sub: payload.sub
-            };
+            // Check if running from file:// protocol (not supported by Appwrite OAuth)
+            if (window.location.protocol === 'file:') {
+                const message = '⚠️ Bạn đang mở file trực tiếp từ máy tính (file://).\n\n' +
+                    'Appwrite OAuth yêu cầu chạy qua web server (HTTP/HTTPS).\n\n' +
+                    'Vui lòng chạy một trong các cách sau:\n\n' +
+                    '1. VS Code: Cài extension "Live Server" và click "Go Live"\n' +
+                    '2. Python: python -m http.server 8000\n' +
+                    '3. Node.js: npx http-server\n\n' +
+                    'Sau đó mở http://localhost:8000/store.html';
+                alert(message);
+                return;
+            }
             
-            // Load existing balance or start with 0
-            const savedBalance = localStorage.getItem('store_balance');
-            userBalance = savedBalance ? parseFloat(savedBalance) : 0;
+            // Check if origin is valid (not null or empty)
+            if (!window.location.origin || window.location.origin === 'null') {
+                alert('⚠️ Không thể xác định URL hiện tại. Vui lòng chạy website qua web server (localhost).');
+                return;
+            }
             
-            saveUserData();
-            showUserMenu();
-            document.getElementById('login-modal').style.display = 'none';
+            // Try to initialize Appwrite if not already done
+            if (!account) {
+                const initialized = initializeAppwrite();
+                if (!initialized) {
+                    alert('Không thể khởi tạo Appwrite. Vui lòng kiểm tra Console (F12) để xem lỗi chi tiết.');
+                    return;
+                }
+            }
+            
+            try {
+                // Get Appwrite SDK reference
+                const AppwriteSDK = window.AppwriteSDK;
+                
+                // Get current URL for redirect (must be HTTP/HTTPS)
+                const successUrl = window.location.origin + window.location.pathname;
+                const failureUrl = window.location.origin + window.location.pathname + '?error=auth_failed';
+                
+                // Validate URLs
+                if (!successUrl.startsWith('http://') && !successUrl.startsWith('https://')) {
+                    alert('⚠️ URL không hợp lệ: ' + successUrl + '\n\nVui lòng chạy website qua web server (localhost).');
+                    return;
+                }
+                
+                console.log('Initiating Google OAuth with:', {
+                    successUrl: successUrl,
+                    failureUrl: failureUrl
+                });
+                
+                // Create OAuth2 session with Google
+                account.createOAuth2Session(
+                    AppwriteSDK.OAuthProvider.Google,
+                    successUrl,
+                    failureUrl
+                );
+            } catch (error) {
+                console.error('Error initiating Google sign-in:', error);
+                alert('Có lỗi xảy ra khi đăng nhập:\n' + (error.message || error.toString()) + '\n\nVui lòng kiểm tra Console (F12) để xem chi tiết.');
+            }
+        }
+        
+        async function checkUserSession() {
+            // Try to initialize Appwrite if not already done
+            if (!account) {
+                const initialized = initializeAppwrite();
+                if (!initialized) {
+                    return;
+                }
+            }
+            
+            try {
+                const user = await account.get();
+                
+                currentUser = {
+                    email: user.email,
+                    name: user.name || user.email,
+                    picture: '', // Appwrite doesn't provide picture by default
+                    sub: user.$id
+                };
+                
+                // Load existing balance or start with 0
+                const savedBalance = localStorage.getItem('store_balance');
+                userBalance = savedBalance ? parseFloat(savedBalance) : 0;
+                
+                saveUserData();
+                showUserMenu();
+                document.getElementById('login-modal').style.display = 'none';
+            } catch (error) {
+                // User is not logged in, show login button
+                console.log('User not logged in');
+            }
         }
         
         // User menu toggle
@@ -859,8 +1158,32 @@
             lastScroll = currentScroll;
         });
 
+        // Category filter
         document.addEventListener('DOMContentLoaded', () => {
+            // Check if running from file:// and show warning
+            if (window.location.protocol === 'file:') {
+                console.warn('⚠️ Đang chạy từ file:// - OAuth sẽ không hoạt động!');
+                console.warn('Vui lòng chạy qua web server:');
+                console.warn('  - VS Code: Cài "Live Server" extension');
+                console.warn('  - Python: python -m http.server 8000');
+                console.warn('  - Node.js: npx http-server');
+                console.warn('Sau đó mở: http://localhost:8000/store.html');
+            }
+            
+            // Initialize Google sign-in buttons immediately
+            initializeGoogleSignIn();
+            
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentCategory = btn.dataset.category;
+                    renderProducts(currentCategory);
+                });
+            });
+            
             loadUserData();
+            loadStockFromDB();
             renderProducts();
             updateCart();
             applyTranslations();
